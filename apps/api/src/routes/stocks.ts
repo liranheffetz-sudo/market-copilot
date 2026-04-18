@@ -1,87 +1,149 @@
-import { z } from "zod";
+const BASE_URL = "https://finnhub.io/api/v1"
 
-import type { FastifyPluginAsync } from "fastify";
+function getApiKey() {
+  const key = process.env.FINNHUB_API_KEY
+  if (!key) throw new Error("FINNHUB_API_KEY missing")
+  return key
+}
 
-import { getAiSnapshot, getChartSnapshot, getDashboard, getFundamentalsSnapshot, getNewsSnapshot, searchStocks } from "../services/stock-service.js";
+async function fetchFinnhub(path, params = {}) {
+  const url = new URL(`${BASE_URL}${path}`)
+  const API_KEY = getApiKey()
 
-const intervalSchema = z.enum(["1m", "5m", "1h", "1D", "1W"]).default("1D");
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) url.searchParams.append(k, v)
+  })
 
-const querySchema = z.object({
-  interval: intervalSchema.optional(),
-  compare: z.string().optional()
-});
+  url.searchParams.append("token", API_KEY)
 
-const compareSymbolsFrom = (value?: string) =>
-  (value ?? "")
-    .split(",")
-    .map((symbol) => symbol.trim().toUpperCase())
-    .filter(Boolean)
-    .slice(0, 4);
+  const res = await fetch(url.toString())
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Finnhub error ${res.status}: ${text}`)
+  }
 
-export const stockRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/search", async (request, reply) => {
-    const searchQuery = z
-      .object({
-        q: z.string().trim().min(1).max(40)
-      })
-      .parse(request.query);
+  return res.json()
+}
 
-    const { results, usedFallback } = await searchStocks(searchQuery.q);
-    return reply.send({
-      results,
-      meta: {
-        usedFallback
-      }
-    });
-  });
+//
+// 🔍 SEARCH
+//
+export async function searchStocks(query) {
+  const data = await fetchFinnhub("/search", { q: query })
 
-  app.get("/:symbol/dashboard", async (request, reply) => {
-    const params = z.object({ symbol: z.string().trim().min(1).max(16) }).parse(request.params);
-    const query = querySchema.parse(request.query);
+  return {
+    results: (data.result || []).map((item) => ({
+      symbol: item.symbol,
+      name: item.description
+    })),
+    usedFallback: false
+  }
+}
 
-    const payload = await getDashboard(
-      params.symbol.toUpperCase(),
-      query.interval ?? "1D",
-      compareSymbolsFrom(query.compare).filter((item) => item !== params.symbol.toUpperCase())
-    );
+//
+// 📊 DASHBOARD (price snapshot)
+//
+export async function getDashboard(symbol) {
+  const quote = await fetchFinnhub("/quote", { symbol })
 
-    return reply.send(payload);
-  });
+  return {
+    symbol,
+    price: quote.c,
+    change: quote.d,
+    percentChange: quote.dp,
+    high: quote.h,
+    low: quote.l,
+    open: quote.o,
+    prevClose: quote.pc
+  }
+}
 
-  app.get("/:symbol/chart", async (request, reply) => {
-    const params = z.object({ symbol: z.string().trim().min(1).max(16) }).parse(request.params);
-    const query = querySchema.parse(request.query);
+//
+// 📈 CHART (candles)
+//
+export async function getChartSnapshot(symbol, interval) {
+  const now = Math.floor(Date.now() / 1000)
+  const from = now - 60 * 60 * 24 * 30 // last 30 days
 
-    const payload = await getChartSnapshot(
-      params.symbol.toUpperCase(),
-      query.interval ?? "1D",
-      compareSymbolsFrom(query.compare).filter((item) => item !== params.symbol.toUpperCase())
-    );
+  const resolutionMap = {
+    "1m": "1",
+    "5m": "5",
+    "1h": "60",
+    "1D": "D",
+    "1W": "W"
+  }
 
-    return reply.send(payload);
-  });
+  const data = await fetchFinnhub("/stock/candle", {
+    symbol,
+    resolution: resolutionMap[interval] || "D",
+    from,
+    to: now
+  })
 
-  app.get("/:symbol/fundamentals", async (request, reply) => {
-    const params = z.object({ symbol: z.string().trim().min(1).max(16) }).parse(request.params);
-    const query = querySchema.parse(request.query);
+  return {
+    symbol,
+    candles: data
+  }
+}
 
-    const payload = await getFundamentalsSnapshot(params.symbol.toUpperCase(), query.interval ?? "1D");
-    return reply.send(payload);
-  });
+//
+// 📉 FUNDAMENTALS
+//
+export async function getFundamentalsSnapshot(symbol) {
+  const profile = await fetchFinnhub("/stock/profile2", { symbol })
+  const metrics = await fetchFinnhub("/stock/metric", {
+    symbol,
+    metric: "all"
+  })
 
-  app.get("/:symbol/news", async (request, reply) => {
-    const params = z.object({ symbol: z.string().trim().min(1).max(16) }).parse(request.params);
-    const query = querySchema.parse(request.query);
+  return {
+    symbol,
+    name: profile.name,
+    industry: profile.finnhubIndustry,
+    marketCap: profile.marketCapitalization,
+    metrics: metrics.metric
+  }
+}
 
-    const payload = await getNewsSnapshot(params.symbol.toUpperCase(), query.interval ?? "1D");
-    return reply.send(payload);
-  });
+//
+// 📰 NEWS
+//
+export async function getNewsSnapshot(symbol) {
+  const to = new Date().toISOString().split("T")[0]
+  const from = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0]
 
-  app.get("/:symbol/insight", async (request, reply) => {
-    const params = z.object({ symbol: z.string().trim().min(1).max(16) }).parse(request.params);
-    const query = querySchema.parse(request.query);
+  const news = await fetchFinnhub("/company-news", {
+    symbol,
+    from,
+    to
+  })
 
-    const payload = await getAiSnapshot(params.symbol.toUpperCase(), query.interval ?? "1D");
-    return reply.send(payload);
-  });
-};
+  return {
+    symbol,
+    news: news.slice(0, 10).map((n) => ({
+      headline: n.headline,
+      summary: n.summary,
+      url: n.url,
+      source: n.source,
+      datetime: n.datetime
+    }))
+  }
+}
+
+//
+// 🤖 AI INSIGHT (simple placeholder)
+//
+export async function getAiSnapshot(symbol) {
+  const quote = await fetchFinnhub("/quote", { symbol })
+
+  let bias = "neutral"
+  if (quote.dp > 2) bias = "bullish"
+  if (quote.dp < -2) bias = "bearish"
+
+  return {
+    symbol,
+    bias,
+    change: quote.dp,
+    summary: `Stock is currently ${bias} with ${quote.dp}% movement today`
+  }
+}
