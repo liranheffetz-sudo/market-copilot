@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: market-copilot-api
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build -w @market-copilot/shared && npm run build -w @market-copilot/api
+    startCommand: npm run start -w @market-copilot/api
+    autoDeploy: false
+    envVars:
+      - key: API_PORT
+        value: 4000

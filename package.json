@@ -1,0 +1,27 @@
+{
+  "name": "market-copilot",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "postinstall": "npm run build -w @market-copilot/shared",
+    "dev": "concurrently \"npm run dev -w @market-copilot/api\" \"npm run dev -w @market-copilot/web\"",
+    "dev:web": "npm run dev -w @market-copilot/web",
+    "dev:api": "npm run dev -w @market-copilot/api",
+    "build": "npm run build -w @market-copilot/shared && npm run build -w @market-copilot/api && npm run build -w @market-copilot/web",
+    "typecheck": "npm run build -w @market-copilot/shared && npm run typecheck -w @market-copilot/api && npm run typecheck -w @market-copilot/web",
+    "lint": "npm run build -w @market-copilot/shared && npm run lint -w @market-copilot/api && npm run lint -w @market-copilot/web",
+    "test": "npm run test -w @market-copilot/shared",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prettier": "^3.5.3"
+  }
+}

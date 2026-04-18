@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 30%),
+    radial-gradient(circle at top right, rgba(45, 212, 191, 0.12), transparent 26%),
+    linear-gradient(180deg, #06111f 0%, #020816 100%);
+}
+
+body {
+  color: #e2e8f0;
+  font-family: var(--font-geist-sans, "IBM Plex Sans", "Segoe UI", sans-serif);
+}
+
+* {
+  border-color: rgba(148, 163, 184, 0.14);
+}
+
+.panel {
+  @apply rounded-3xl border border-white/10 bg-slate-950/55 shadow-panel backdrop-blur-xl;
+}
+
+.panel-muted {
+  @apply rounded-2xl border border-white/10 bg-white/5;
+}
+
+.section-title {
+  @apply text-sm uppercase tracking-[0.24em] text-slate-400;
+}
+
+.scroll-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+}
