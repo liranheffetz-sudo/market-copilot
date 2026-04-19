@@ -3,7 +3,9 @@ import { buildServer } from "./server.js";
 
 const start = async () => {
   const app = buildServer();
-
+consr PORT = process.env.PORT || env.API_PORT || 3000;
+  const HOST = "0.0.0.0";
+  
   try {
     await app.listen({
       host: env.API_HOST,
