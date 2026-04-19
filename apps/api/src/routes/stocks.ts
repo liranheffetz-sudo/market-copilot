@@ -146,4 +146,57 @@ export async function getAiSnapshot(symbol) {
     change: quote.dp,
     summary: `Stock is currently ${bias} with ${quote.dp}% movement today`
   }
+import type { FastifyPluginAsync } from "fastify";
+
+export const stockRoutes: FastifyPluginAsync = async (app) => {
+
+  app.get("/search", async (req, reply) => {
+
+    const { q } = req.query as any;
+
+    return reply.send(await searchStocks(q));
+
+  });
+
+  app.get("/:symbol/dashboard", async (req, reply) => {
+
+    const { symbol } = req.params as any;
+
+    return reply.send(await getDashboard(symbol));
+
+  });
+
+  app.get("/:symbol/chart", async (req, reply) => {
+
+    const { symbol } = req.params as any;
+
+    return reply.send(await getChartSnapshot(symbol, "1D"));
+
+  });
+
+  app.get("/:symbol/fundamentals", async (req, reply) => {
+
+    const { symbol } = req.params as any;
+
+    return reply.send(await getFundamentalsSnapshot(symbol));
+
+  });
+
+  app.get("/:symbol/news", async (req, reply) => {
+
+    const { symbol } = req.params as any;
+
+    return reply.send(await getNewsSnapshot(symbol));
+
+  });
+
+  app.get("/:symbol/insight", async (req, reply) => {
+
+    const { symbol } = req.params as any;
+
+    return reply.send(await getAiSnapshot(symbol));
+
+  });
+
+}
 }
